@@ -1,0 +1,427 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PipeTwin</title></head><body style="margin:0;background:#aebed5"><section id="pipetwin-corrosion-profile" aria-label="Прототип PipeTwin">
+  <header class="shell">
+    <div class="identity"><span class="brand-mark" aria-hidden="true"></span>PipeTwin</div>
+    <div class="modes" role="group" aria-label="Режим прогноза">
+      <button type="button" data-mode="0" aria-pressed="true">После ВТД</button>
+      <button type="button" data-mode="1" aria-pressed="false">От ввода</button>
+    </div>
+  </header>
+  <div class="hero">
+    <h1>Прогноз толщины стенки</h1>
+  </div>
+  <div class="workspace">
+    <form class="inputs">
+      <h2>Входные данные</h2>
+      <label class="date-label">Номер трубы
+        <select class="pipe-id" required>
+          <option value="" disabled selected>Выберите номер трубы</option>
+        </select>
+      </label>
+      <label class="date-label">Дата прогноза
+        <input class="target-date" type="date" required>
+      </label>
+      <button class="calculate" type="submit">Рассчитать прогноз <span aria-hidden="true">↗</span></button>
+      <p class="form-note" role="status"></p>
+    </form>
+    <div class="result" aria-label="Прогноз вдоль трубопровода" hidden>
+      <div class="result-head">
+        <div><h2 class="asset">Трубопровод 01</h2><p class="result-meta"></p></div>
+        <button class="highlight" type="button" aria-pressed="false">Подсветить 10% самых тонких</button>
+      </div>
+      <div class="scene">
+        <div class="callout" aria-hidden="true">
+          <div class="segment-summary">
+            <span class="segment-distance"></span>
+            <strong class="segment-value"></strong>
+            <span class="segment-origin"></span>
+          </div>
+          <div class="section-summary">
+            <span>Разрез от номинала</span>
+            <div class="wall-section"><span class="wall-loss"></span></div>
+            <span class="segment-loss"></span>
+          </div>
+        </div>
+        <div class="pipe" role="group" aria-label="Сегменты трубопровода"></div>
+        <div class="axis" aria-hidden="true"></div>
+      </div>
+      <div class="result-foot">
+        <span class="legend"><span aria-hidden="true"></span><span class="legend-label">Прогноз по 10-метровым сегментам</span></span>
+        <button class="zoom" type="button" aria-pressed="false">Приблизить участок</button>
+      </div>
+      <button class="download" type="button">Скачать result.csv</button><button class="priority-download" type="button">Скачать нижние 10%</button><output class="readout" aria-live="polite"></output>
+    </div>
+  </div>
+</section>
+<style>
+#pipetwin-corrosion-profile{--blue:#1854e9;--bright:#487bff;--ink:#142341;--sub:#3e506e;--rule:#afbed5;--flag:#ff4c5b;color-scheme:light;background:radial-gradient(ellipse at 85% 0%,#d1def0,#aebed5 78%);color:var(--ink);font:14px/1.45 "Manrope","Segoe UI",sans-serif;width:100%;overflow:hidden}
+#pipetwin-corrosion-profile *{box-sizing:border-box}
+#pipetwin-corrosion-profile h1,#pipetwin-corrosion-profile h2,#pipetwin-corrosion-profile p{margin:0}
+#pipetwin-corrosion-profile h1{font-size:clamp(26px,4vw,42px);font-weight:600;letter-spacing:-.034em;line-height:1.08}
+#pipetwin-corrosion-profile h2{font-size:17px;letter-spacing:-.02em}
+#pipetwin-corrosion-profile button,#pipetwin-corrosion-profile input{font:inherit}
+#pipetwin-corrosion-profile button{cursor:pointer}
+#pipetwin-corrosion-profile :focus-visible{outline:2px solid #759aff;outline-offset:3px;z-index:2}
+#pipetwin-corrosion-profile .shell{display:flex;align-items:center;gap:26px;flex-wrap:wrap;background:var(--blue);color:#fff;padding:14px clamp(16px,4vw,36px);padding-right:max(90px,4vw)}
+#pipetwin-corrosion-profile .identity{display:flex;align-items:center;gap:10px;font-size:22px;font-weight:700;letter-spacing:-.035em}
+#pipetwin-corrosion-profile .brand-mark{width:23px;height:22px;display:inline-block;background:#fff;clip-path:polygon(0 0,100% 0,100% 20%,23% 20%,23% 40%,82% 40%,82% 60%,23% 60%,23% 80%,61% 80%,61% 100%,0 100%)}
+#pipetwin-corrosion-profile .modes{display:flex;gap:3px;padding:3px;background:#103ebc;border-radius:7px}
+#pipetwin-corrosion-profile .modes button{border:0;background:transparent;color:#fff;white-space:nowrap;padding:7px 12px;border-radius:5px}
+#pipetwin-corrosion-profile .modes button[aria-pressed=true]{background:#fff;color:#103ebc;font-weight:650}
+#pipetwin-corrosion-profile .hero{padding:26px clamp(16px,4vw,36px) 20px;display:flex;align-items:baseline;gap:10px 24px;flex-wrap:wrap;justify-content:space-between}
+#pipetwin-corrosion-profile .hero span{color:var(--sub);font-size:12px}
+#pipetwin-corrosion-profile .workspace{display:grid;grid-template-columns:minmax(225px,27%) minmax(0,1fr);gap:14px;padding:0 clamp(12px,2.2vw,24px) 22px}
+#pipetwin-corrosion-profile .inputs{background:#dbe5f1;border:1px solid var(--rule);border-radius:9px;padding:16px;display:grid;align-content:start;gap:12px;min-width:0}
+#pipetwin-corrosion-profile .files{display:grid;gap:6px}
+#pipetwin-corrosion-profile .file-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:7px;padding:7px 0;border-bottom:1px solid var(--rule);font-size:12px}
+#pipetwin-corrosion-profile .file-row small{display:block;color:var(--sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#pipetwin-corrosion-profile .file-row input{width:100%;margin-top:4px;font-size:11px;color:var(--sub)}
+#pipetwin-corrosion-profile .file-row input::file-selector-button{border:0;background:#e8efff;color:#123fb7;border-radius:4px;padding:4px 6px;margin-right:6px;cursor:pointer}
+#pipetwin-corrosion-profile .date-label{display:grid;gap:4px;font-size:12px}
+#pipetwin-corrosion-profile input[type=date],#pipetwin-corrosion-profile .pipe-id{width:100%;min-width:0;padding:7px 8px;border:1px solid var(--rule);border-radius:5px;color:var(--ink);background:#e6edf7}
+#pipetwin-corrosion-profile .calculate,#pipetwin-corrosion-profile .example{border:0;border-radius:5px;padding:9px 8px;font-weight:650}
+#pipetwin-corrosion-profile .calculate{background:var(--blue);color:white;display:flex;justify-content:space-between;gap:4px}
+#pipetwin-corrosion-profile .example{color:#123ca9;background:#ccdafa}
+#pipetwin-corrosion-profile .form-note{color:var(--sub);font-size:12px}
+#pipetwin-corrosion-profile .form-note:empty{display:none}
+#pipetwin-corrosion-profile .result{color:#f4f7ff;background:#101b36;border:1px solid #243b67;border-radius:9px;min-width:0;overflow:hidden}
+#pipetwin-corrosion-profile .result-head,#pipetwin-corrosion-profile .result-foot{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;padding:14px 16px}
+#pipetwin-corrosion-profile .result-meta,#pipetwin-corrosion-profile .result-foot{color:#b9c9e9;font-size:12px}
+#pipetwin-corrosion-profile .result-meta{margin-top:4px}
+#pipetwin-corrosion-profile .highlight,#pipetwin-corrosion-profile .zoom{border:1px solid #415b8e;border-radius:5px;background:#1d3056;color:#f4f7ff;padding:6px 9px;font-size:12px}
+#pipetwin-corrosion-profile .highlight[aria-pressed=true]{color:#fff;background:#85293c;border-color:#ff6b76}
+#pipetwin-corrosion-profile .scene{position:relative;min-width:0;padding:123px 32px 26px;background:linear-gradient(#33518c38 1px,transparent 1px),linear-gradient(90deg,#33518c38 1px,transparent 1px),radial-gradient(ellipse at 48% 48%,#243754,#101a2c 76%);background-size:24px 24px,24px 24px,100% 100%}
+#pipetwin-corrosion-profile .pipe{
+  --grain:repeating-linear-gradient(0deg,#eff6ff17 0 1px,transparent 1px 4px,#06090f19 4px 5px,transparent 5px 8px);
+  --steel:linear-gradient(180deg,#475361 0%,#76818e 10%,#aab3bc 24%,#9da9b5 34%,#818d9a 49%,#626f7d 62%,#404c59 85%,#292f39 98%);
+  position:relative;display:flex;height:clamp(62px,10vw,104px);
+  filter:drop-shadow(0 16px 10px #050914a6);
+}
+#pipetwin-corrosion-profile .pipe::after{
+  content:"";position:absolute;z-index:2;left:-16px;top:0;width:34px;height:100%;border-radius:50%;
+  background:linear-gradient(143deg,#f0f2f5,#8d9ba7 32%,#515c68 57%,#9da9b5 77%,#454e59);
+  box-shadow:inset 0 0 0 1px #d7dee6a6,2px 0 2px #1b2533a8;
+  pointer-events:none;
+}
+#pipetwin-corrosion-profile .pipe::before{
+  content:"";position:absolute;z-index:3;left:-11px;top:5px;bottom:5px;width:24px;border-radius:50%;
+  background:radial-gradient(ellipse at 80% 28%,#687585,#2e3946 43%,#101924 74%);
+  box-shadow:inset 2px 0 3px #111822,inset -1px 0 1px #ced7e579;
+  pointer-events:none;
+}
+#pipetwin-corrosion-profile .segment{
+  position:relative;flex:1;min-width:0;padding:0;border:0;
+  background:var(--grain),var(--steel);box-shadow:inset 0 1px #d7dee33b,inset 0 -1px #080e1b6e;
+}
+#pipetwin-corrosion-profile .segment[data-joint]::before{
+  content:"";position:absolute;inset:0 auto 0 0;width:2px;
+  background:linear-gradient(#2a313b,#75808a 18%,#59636f 40%,#242c36 82%);
+  box-shadow:1px 0 #dce2e553,-1px 0 #11182266;pointer-events:none;
+}
+#pipetwin-corrosion-profile .segment:last-child{border-radius:0 22% 22% 0}
+#pipetwin-corrosion-profile .segment.flag{
+  z-index:1;
+  background:var(--grain),linear-gradient(#972c44,#f64b5f 20%,#ff939a 36%,#ff5767 52%,#c01f3e 78%,#71152e);
+  box-shadow:0 0 10px #ff43566b,inset 0 1px #ffb7c095;
+}
+#pipetwin-corrosion-profile .segment.active::after,#pipetwin-corrosion-profile .segment:hover::after{
+  content:"";position:absolute;inset:0;
+  border:1px solid #eff5ff;border-bottom:3px solid #eff5ff;pointer-events:none;
+}
+#pipetwin-corrosion-profile .pipe-overview{
+  position:relative;flex:1;min-width:0;padding:0;border:0;border-radius:0 9px 9px 0;
+  background:var(--grain),var(--steel);overflow:hidden;
+}
+#pipetwin-corrosion-profile .pipe-overview::before{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(#972c44,#f64b5f 20%,#ff939a 36%,#ff5767 52%,#c01f3e 78%,#71152e);
+  mask-image:var(--priority-mask,linear-gradient(transparent,transparent));
+}
+#pipetwin-corrosion-profile .pipe-overview::after{
+  content:"";position:absolute;inset:0 auto 0 var(--segment-center,0%);
+  width:2px;background:#eff5ff;pointer-events:none;
+}
+#pipetwin-corrosion-profile .callout{position:absolute;top:12px;left:var(--tip-left,50%);transform:translateX(-50%);z-index:4;display:flex;align-items:center;gap:13px;background:#192945;border:1px solid #4a638d;border-radius:6px;color:#edf3ff;padding:8px 11px;width:max-content;max-width:calc(100% - 16px);font-size:11px;pointer-events:none}
+#pipetwin-corrosion-profile .callout strong{font-size:24px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
+#pipetwin-corrosion-profile .segment-summary,#pipetwin-corrosion-profile .section-summary{display:grid;gap:4px}
+#pipetwin-corrosion-profile .section-summary{border-left:1px solid #496188;padding-left:12px;min-width:103px}
+#pipetwin-corrosion-profile .segment-origin,#pipetwin-corrosion-profile .section-summary{color:#c4d4f1}
+#pipetwin-corrosion-profile .wall-section{position:relative;width:100%;height:32px;border:1px solid #77a2cc;background:linear-gradient(#bccbd8,#849aaf 61%,#617a94);overflow:hidden}
+#pipetwin-corrosion-profile .wall-loss{position:absolute;inset:0;clip-path:polygon(var(--pit-profile,0 0,100% 0,100% 0,0 0));background:repeating-linear-gradient(135deg,#6d9cca 0 1px,transparent 1px 5px),#243956}
+#pipetwin-corrosion-profile .segment-loss{font-variant-numeric:tabular-nums}
+#pipetwin-corrosion-profile .pointer{position:absolute;top:101px;width:1px;height:22px;background:#b1c8ef;pointer-events:none}
+#pipetwin-corrosion-profile .axis{display:flex;justify-content:space-between;gap:2px;color:#c7d5ef;font-size:11px;margin-top:10px;font-variant-numeric:tabular-nums}
+#pipetwin-corrosion-profile .legend{display:flex;align-items:center;gap:7px}
+#pipetwin-corrosion-profile .legend > span:first-child{width:9px;height:9px;background:#adbed7;border-radius:2px;flex-shrink:0}
+#pipetwin-corrosion-profile .legend.on > span:first-child{background:var(--flag)}
+#pipetwin-corrosion-profile .readout{display:block;border-top:1px solid #304567;padding:11px 16px;color:#d6e3fc;font-size:12px}
+@media(max-width:670px){#pipetwin-corrosion-profile .workspace{grid-template-columns:1fr}#pipetwin-corrosion-profile .shell{gap:8px 18px}#pipetwin-corrosion-profile .inputs{grid-row:2}#pipetwin-corrosion-profile .hero{padding-top:18px}}
+@media(prefers-reduced-motion:reduce){#pipetwin-corrosion-profile .segment{transition:none}}
+#pipetwin-corrosion-profile .download,#pipetwin-corrosion-profile .priority-download{margin:8px 12px;background:#243d69;color:#fff;border:1px solid #526e9d;padding:8px;border-radius:5px}
+#pipetwin-corrosion-profile details{font-size:12px;overflow-wrap:anywhere}
+#pipetwin-corrosion-profile .rate{width:100%;padding:8px}
+#pipetwin-corrosion-profile [hidden]{display:none!important}
+</style>
+<script>
+(() => {
+  const root = document.getElementById('pipetwin-corrosion-profile');
+  const get = (selector) => root.querySelector(selector);
+  const number = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 });
+  const thickness = (value) => number.format(value) + ' мм';
+  const percent = new Intl.NumberFormat('ru-RU', { style: 'percent' });
+  const distance = (index) => number.format(index * 10) + ' м';
+  let mode = 0;
+  let highlighted = false;
+  let focused = 27;
+  let zoomStart = null;
+  let date = '';
+  let result = null;
+  let loading = false;
+  let values = [];
+  let thinnest = new Set();
+  let marks = [];
+  let overview = null;
+  let hovered = null;
+
+  function prepare() {
+    const current = result;
+    values = current.segments.map(row => row.thickness_pred);
+    date = current.date;
+    thinnest = new Set(current.priority.map(row => row.segment_id));
+    focused = Math.min(focused, values.length - 1);
+  }
+
+  function listPipes(pipes) {
+    get('.pipe-id').append(...pipes.map(pipe => {
+      const option = document.createElement('option');
+      option.value = pipe.id;
+      option.textContent = pipe.id;
+      return option;
+    }));
+  }
+
+  function segmentEnd(index) {
+    return number.format(result.segments[index].end_m) + ' м';
+  }
+
+  function inspect(index, announce = false) {
+    const callout = get('.callout');
+    const mark = overview ?? marks[index - (zoomStart ?? 0)];
+    if (!mark) return;
+    const scene = get('.scene');
+    const sceneBox = scene.getBoundingClientRect();
+    const markBox = mark.getBoundingClientRect();
+    const fraction = overview ? (index + 0.5) / values.length : 0.5;
+    const center = markBox.left + markBox.width * fraction - sceneBox.left;
+    if (overview) overview.style.setProperty('--segment-center', fraction * 100 + '%');
+    const prediction = values[index];
+    const {baseline, nominal} = result.segments[index];
+    const loss = Math.max(0, nominal - prediction);
+    const share = loss / nominal;
+    const range = distance(index) + ' – ' + segmentEnd(index);
+    const origin = result.case === '2' ? 'По паспорту ' + thickness(nominal) :
+      baseline === null ? 'Нет замера ВТД' : 'По ВТД ' + thickness(baseline);
+    const change = result.case === '1' && baseline !== null
+      ? ' · Изменение после ВТД ' + number.format(prediction - baseline) + ' мм' : '';
+    const thinning = 'Утонение ' + thickness(loss) + ' · ' + percent.format(share);
+    get('.segment-distance').textContent = range;
+    get('.segment-value').textContent = thickness(prediction);
+    get('.segment-origin').textContent = origin;
+    get('.segment-loss').textContent = thinning;
+    // The deepest point encodes the predicted loss. The pit shape is illustrative.
+    const contour = [[0, 0.12], [9, 0.18], [16, 0.38], [23, 0.27], [30, 0.51],
+      [36, 0.44], [44, 0.71], [50, 0.61], [57, 1], [64, 0.88], [71, 0.48],
+      [80, 0.61], [90, 0.3], [96, 0.34], [100, 0.13]];
+    const edge = contour.map(([x, depth]) => x + '% ' + (share * depth * 100).toFixed(2) + '%');
+    get('.wall-section').style.setProperty('--pit-profile', ['100% 0', '0 0', ...edge, '100% 0'].join(', '));
+    const inset = callout.offsetWidth / 2 + 8;
+    callout.style.setProperty('--tip-left', Math.max(inset, Math.min(center, sceneBox.width - inset)) + 'px');
+    get('.pointer').style.left = center + 'px';
+    if (announce) {
+      get('.readout').textContent = range + ' · Прогноз ' + thickness(prediction) + ' · ' + origin + change + ' · От номинала ' + thickness(loss) + ' (' + percent.format(share) + ')' + (highlighted && thinnest.has(index) ? ' · В нижних 10%' : '');
+    }
+  }
+
+  function markFlags() {
+    if (overview) {
+      if (highlighted) {
+        const stops = ['transparent 0%'];
+        for (const index of [...thinnest].sort((a, b) => a - b)) {
+          const left = index / values.length * 100 + '%';
+          const right = (index + 1) / values.length * 100 + '%';
+          stops.push('transparent ' + left, '#000 ' + left + ' ' + right, 'transparent ' + right);
+        }
+        overview.style.setProperty('--priority-mask', 'linear-gradient(90deg,' + stops.join(',') + ')');
+      } else {
+        overview.style.removeProperty('--priority-mask');
+      }
+    }
+    for (const mark of marks) {
+      const index = Number(mark.dataset.index);
+      const flagged = highlighted && thinnest.has(index);
+      mark.classList.toggle('flag', flagged);
+      mark.setAttribute('aria-label', distance(index) + ' – ' + segmentEnd(index) + ', ' + thickness(values[index]) + (flagged ? ', в нижних 10%' : ''));
+    }
+    get('.highlight').setAttribute('aria-pressed', String(highlighted));
+    get('.highlight').textContent = highlighted ? 'Снять подсветку 10%' : 'Подсветить 10% самых тонких';
+    get('.legend').classList.toggle('on', highlighted);
+    get('.legend-label').textContent = highlighted ? thinnest.size + ' из ' + values.length + ' сегментов · нижние 10% по всей трубе' : 'Прогноз по 10-метровым сегментам';
+    inspect(focused, true);
+  }
+
+  function makeOverview() {
+    const control = document.createElement('button');
+    control.type = 'button';
+    control.className = 'pipe-overview';
+    control.setAttribute('aria-label', 'Выбрать сегмент трубы. Используйте стрелки влево и вправо.');
+    const indexAt = event => {
+      const box = control.getBoundingClientRect();
+      return Math.max(0, Math.min(values.length - 1, Math.floor((event.clientX - box.left) / box.width * values.length)));
+    };
+    control.addEventListener('pointermove', event => {
+      const index = indexAt(event);
+      if (index === hovered) return;
+      hovered = index;
+      inspect(index);
+    });
+    control.addEventListener('click', event => {
+      if (event.detail) focused = indexAt(event);
+      inspect(focused, true);
+    });
+    control.addEventListener('keydown', event => {
+      const step = event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowRight' ? 1 : 0;
+      if (!step) return;
+      event.preventDefault();
+      focused = Math.max(0, Math.min(values.length - 1, focused + step));
+      inspect(focused, true);
+    });
+    return control;
+  }
+
+  function render() {
+    const start = zoomStart ?? 0;
+    const end = zoomStart === null ? values.length : Math.min(start + 12, values.length);
+    get('.asset').textContent = 'Трубопровод ' + result.id;
+    get('.result-meta').textContent = number.format(result.length) + ' м · ' + values.length + ' сегментов · ' + date.split('-').reverse().join('.') + ' · ' + result.model;
+    overview = end - start > 120 ? makeOverview() : null;
+    hovered = null;
+    marks = Array.from({length: overview ? 0 : end - start}, (_, offset) => {
+      const index = start + offset;
+      const mark = document.createElement('button');
+      mark.type = 'button';
+      mark.dataset.index = index;
+      if (index > 0 && index % 10 === 0) mark.dataset.joint = '';
+      mark.className = index === focused ? 'segment active' : 'segment';
+      mark.addEventListener('pointerenter', () => inspect(index));
+      mark.addEventListener('focus', () => inspect(index, true));
+      mark.addEventListener('click', () => {
+        focused = index;
+        marks.forEach((item) => item.classList.toggle('active', item === mark));
+        inspect(index, true);
+      });
+      return mark;
+    });
+    get('.pipe').replaceChildren(...(overview ? [overview] : marks));
+    get('.axis').replaceChildren(...Array.from({length: 4}, (_, offset) => {
+      const tick = document.createElement('span');
+      const position = start + Math.round((end - start) * offset / 3);
+      tick.textContent = position ? segmentEnd(position - 1) : distance(0);
+      return tick;
+    }));
+    const zoom = get('.zoom');
+    zoom.textContent = zoomStart === null ? 'Приблизить участок' : 'Вся труба';
+    zoom.setAttribute('aria-pressed', String(zoomStart !== null));
+    markFlags();
+  }
+
+  const pointer = document.createElement('span');
+  pointer.className = 'pointer';
+  pointer.setAttribute('aria-hidden', 'true');
+  get('.scene').append(pointer);
+  get('.pipe').addEventListener('pointerleave', () => {
+    hovered = null;
+    inspect(focused);
+  });
+  for (const button of root.querySelectorAll('[data-mode]')) {
+    button.addEventListener('click', () => {
+      const selected = Number(button.dataset.mode);
+      if (mode === selected) return;
+      mode = selected;
+      root.querySelectorAll('[data-mode]').forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
+      focused = mode === 0 ? 27 : 19;
+      zoomStart = null;
+      highlighted = false;
+      if (!loading && get('.inputs').checkValidity()) run();
+    });
+  }
+  get('.highlight').addEventListener('click', () => {
+    highlighted = !highlighted;
+    markFlags();
+  });
+  get('.zoom').addEventListener('click', () => {
+    zoomStart = zoomStart === null ? Math.max(0, Math.min(focused - 5, values.length - 12)) : null;
+    render();
+  });
+  async function run() {
+    if (loading) return;
+    loading = true;
+    const controls = root.querySelectorAll('.inputs button, .inputs input, .inputs select, [data-mode]');
+    controls.forEach(control => { control.disabled = true; });
+    get('.result').hidden = true;
+    get('.form-note').textContent = 'Расчёт…';
+    try {
+      const response = await fetch('/api/predict', {method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          id: get('.pipe-id').value, date: get('.target-date').value, case: String(mode + 1)
+        })});
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+      result = data;
+      zoomStart = null;
+      highlighted = false;
+      prepare();
+      get('.result').hidden = false;
+      render();
+      get('.form-note').textContent = 'Прогноз готов.';
+    } catch (error) {
+      result = null;
+      get('.form-note').textContent = error.message;
+    } finally {
+      controls.forEach(control => { control.disabled = false; });
+      loading = false;
+    }
+  }
+  get('.inputs').addEventListener('submit', event => { event.preventDefault(); run(); });
+  function download(rows, name) {
+    const escape = value => '"' + String(value).replaceAll('"', '""') + '"';
+    const content = 'id,segment_id,thickness_pred\r\n' +
+      rows.map(row => [escape(row.id), row.segment_id, row.thickness_pred].join(',')).join('\r\n');
+    const url = URL.createObjectURL(new Blob([content], {type:'text/csv;charset=utf-8'}));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = name;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  get('.download').addEventListener('click', () => download(result.rows, 'result.csv'));
+  get('.priority-download').addEventListener('click', () => download(result.priority, 'priority_top10.csv'));
+  const today = new Date();
+  const localDate = new Date(today.getTime() - today.getTimezoneOffset() * 60000);
+  get('.target-date').value = localDate.toISOString().slice(0, 10);
+  fetch('/api/pipes').then(response => {
+    if (!response.ok) throw new Error('Не удалось загрузить список труб.');
+    return response.json();
+  }).then(listPipes).catch(error => { get('.form-note').textContent = error.message; });
+  new ResizeObserver(() => { if (result) inspect(focused); }).observe(get('.scene'));
+  const fontStyle = document.createElement('link');
+  fontStyle.rel = 'stylesheet';
+  fontStyle.media = 'print';
+  fontStyle.href = 'https://fonts.googleapis.com/css2?family=Manrope:wght@400..800&display=swap';
+  fontStyle.addEventListener('load', () => {
+    fontStyle.media = 'all';
+    document.fonts.ready.then(() => { if (result) inspect(focused); });
+  }, {once: true});
+  document.head.append(fontStyle);
+})();
+</script>
+</body></html>
