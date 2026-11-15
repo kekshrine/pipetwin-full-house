@@ -1,0 +1,6 @@
+outputs/
+__pycache__/
+*.pyc
+.venv/
+catboost_info/
+.DS_Store
