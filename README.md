@@ -43,8 +43,8 @@ python -m venv .venv
 **Google Colab** (загрузите шесть CSV в папку `data`):
 
 ```python
-!git clone https://github.com/kekshrine/pipetwin-solution.git
-%cd pipetwin-solution
+!git clone https://github.com/kekshrine/pipetwin-full-house.git
+%cd pipetwin-full-house
 !pip install -q -r requirements.txt
 !python -m pipetwin --data-dir /content/data --out outputs/result.csv
 ```
