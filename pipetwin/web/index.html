@@ -17,6 +17,8 @@
           <option value="" disabled selected>Выберите номер трубы</option>
         </select>
       </label>
+      <div class="targets" hidden><span>Тестовые трубы</span><div class="target-chips"></div></div>
+      <p class="target-note" hidden></p>
       <label class="date-label">Дата прогноза
         <input class="target-date" type="date" required>
       </label>
@@ -81,6 +83,13 @@
 #pipetwin-corrosion-profile .calculate,#pipetwin-corrosion-profile .example{border:0;border-radius:5px;padding:9px 8px;font-weight:650}
 #pipetwin-corrosion-profile .calculate{background:var(--blue);color:white;display:flex;justify-content:space-between;gap:4px}
 #pipetwin-corrosion-profile .example{color:#123ca9;background:#ccdafa}
+#pipetwin-corrosion-profile .targets{display:grid;gap:6px;font-size:12px}
+#pipetwin-corrosion-profile .target-chips{display:flex;flex-wrap:wrap;gap:6px}
+#pipetwin-corrosion-profile .target-chip{border:1px solid #d9a300;background:#fff3c4;color:#5b4300;border-radius:999px;padding:5px 10px;font-size:12px;font-weight:650;text-align:left}
+#pipetwin-corrosion-profile .target-chip small{font-weight:500;opacity:.8}
+#pipetwin-corrosion-profile .target-chip[aria-pressed=true]{background:#ffc928;border-color:#a87b00;color:#2e2200}
+#pipetwin-corrosion-profile .pipe-id.is-target{border-color:#d9a300;background:#fff3c4;font-weight:650}
+#pipetwin-corrosion-profile .target-note{font-size:12px;line-height:1.35;color:#5b4300;background:#fff3c4;border-left:3px solid #d9a300;border-radius:4px;padding:7px 9px}
 #pipetwin-corrosion-profile .form-note{color:var(--sub);font-size:12px}
 #pipetwin-corrosion-profile .form-note:empty{display:none}
 #pipetwin-corrosion-profile .result{color:#f4f7ff;background:#101b36;border:1px solid #243b67;border-radius:9px;min-width:0;overflow:hidden}
@@ -190,13 +199,69 @@
     focused = Math.min(focused, values.length - 1);
   }
 
+  let catalog = new Map();
+  const russianDate = (iso) => iso.split('-').reverse().join('.');
+  const caseName = (item) => item.case === 1 ? 'кейс 1 · После ВТД' : 'кейс 2 · От ввода';
+
   function listPipes(pipes) {
-    get('.pipe-id').append(...pipes.map(pipe => {
-      const option = document.createElement('option');
-      option.value = pipe.id;
-      option.textContent = pipe.id;
-      return option;
+    catalog = new Map(pipes.map(pipe => [pipe.id, pipe]));
+    const option = (pipe) => {
+      const item = document.createElement('option');
+      item.value = pipe.id;
+      item.textContent = pipe.target
+        ? '★ ' + pipe.id + ' · ' + caseName(pipe) + ' · ' + russianDate(pipe.date)
+        : pipe.id + (pipe.has_history ? '' : ' · без ВТД');
+      return item;
+    };
+    const group = (label, items) => {
+      const element = document.createElement('optgroup');
+      element.label = label;
+      element.append(...items.map(option));
+      return element;
+    };
+    const targets = pipes.filter(pipe => pipe.target);
+    const others = pipes.filter(pipe => !pipe.target);
+    get('.pipe-id').append(group('Тестовые трубы', targets), group('Остальные трубы', others));
+    get('.target-chips').append(...targets.map(pipe => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'target-chip';
+      chip.dataset.id = pipe.id;
+      chip.setAttribute('aria-pressed', 'false');
+      chip.innerHTML = '★ ' + pipe.id + ' <small>' + caseName(pipe) + '</small>';
+      chip.addEventListener('click', () => {
+        get('.pipe-id').value = pipe.id;
+        choosePipe(true);
+      });
+      return chip;
     }));
+    get('.targets').hidden = targets.length === 0;
+  }
+
+  function markTarget() {
+    const pipe = catalog.get(get('.pipe-id').value);
+    const exact = Boolean(pipe && pipe.target && mode === pipe.case - 1 && get('.target-date').value === pipe.date);
+    get('.pipe-id').classList.toggle('is-target', Boolean(pipe && pipe.target));
+    root.querySelectorAll('.target-chip').forEach(chip => chip.setAttribute('aria-pressed', String(Boolean(pipe) && chip.dataset.id === pipe.id)));
+    const note = get('.target-note');
+    note.hidden = !(pipe && pipe.target);
+    if (!note.hidden) {
+      note.textContent = exact
+        ? 'Тестовая труба: показываем прогноз из сданного result.csv (' + caseName(pipe) + ', ' + russianDate(pipe.date) + ').'
+        : 'Тестовая труба. Сданный прогноз — ' + caseName(pipe) + ' на ' + russianDate(pipe.date) + '; для другой даты или режима считаем общей моделью.';
+    }
+  }
+
+  function choosePipe(start) {
+    const pipe = catalog.get(get('.pipe-id').value);
+    if (pipe && pipe.target) {
+      get('.target-date').value = pipe.date;
+      setMode(pipe.case - 1);
+    } else if (pipe && !pipe.has_history && mode === 0) {
+      setMode(1);
+    }
+    markTarget();
+    if (start && !loading && get('.inputs').checkValidity()) run();
   }
 
   function segmentEnd(index) {
@@ -300,7 +365,7 @@
   function render() {
     const start = zoomStart ?? 0;
     const end = zoomStart === null ? values.length : Math.min(start + 12, values.length);
-    get('.asset').textContent = 'Трубопровод ' + result.id;
+    get('.asset').textContent = (catalog.get(result.id)?.target ? '★ Тестовая труба ' : 'Трубопровод ') + result.id;
     get('.result-meta').textContent = number.format(result.length) + ' м · ' + values.length + ' сегментов · ' + date.split('-').reverse().join('.') + ' · ' + result.model;
     overview = end - start > 120 ? makeOverview() : null;
     hovered = null;
@@ -341,18 +406,24 @@
     hovered = null;
     inspect(focused);
   });
+  function setMode(selected) {
+    if (mode === selected) return false;
+    mode = selected;
+    root.querySelectorAll('[data-mode]').forEach((item) => item.setAttribute('aria-pressed', String(Number(item.dataset.mode) === mode)));
+    focused = mode === 0 ? 27 : 19;
+    zoomStart = null;
+    highlighted = false;
+    return true;
+  }
   for (const button of root.querySelectorAll('[data-mode]')) {
     button.addEventListener('click', () => {
-      const selected = Number(button.dataset.mode);
-      if (mode === selected) return;
-      mode = selected;
-      root.querySelectorAll('[data-mode]').forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
-      focused = mode === 0 ? 27 : 19;
-      zoomStart = null;
-      highlighted = false;
+      if (!setMode(Number(button.dataset.mode))) return;
+      markTarget();
       if (!loading && get('.inputs').checkValidity()) run();
     });
   }
+  get('.pipe-id').addEventListener('change', () => choosePipe(false));
+  get('.target-date').addEventListener('input', markTarget);
   get('.highlight').addEventListener('click', () => {
     highlighted = !highlighted;
     markFlags();

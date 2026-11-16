@@ -2,8 +2,10 @@
 
     python -m pipetwin.web --data-dir /path/to/raw-csv --open
 
-On start the pipeline builds ``result.csv`` from the raw CSV (the same run as ``python -m pipetwin``),
-then the page shows the forecast along each target pipe and the 10 % thinnest segments.
+On start the pipeline builds ``result.csv`` from the raw CSV (the same run as ``python -m pipetwin``).
+The two test pipes at their forecast dates show the submitted forecast. Any other pipe or date uses the
+same building blocks without the parts tied to the test pipes: case 1 is the forecast from past
+inspections only, case 2 ranks segments by the smoothed route elevation with a terrain-based level.
 """
 
 import argparse
@@ -16,12 +18,13 @@ import webbrowser
 
 import pandas as pd
 
+from pipetwin import case2_elevation, solution
 from pipetwin import forecast as rf
-from pipetwin import solution
 
 WEB = Path(__file__).parent / "web"
 DEFAULT_DATA_DIR = Path(__file__).resolve().parents[2] / "raw_data"
-MODELS = {1: "итоговая смесь трёх прогнозов", 2: "сглаженная высота трассы"}
+FINAL = {1: "итоговая модель сдачи (смесь трёх прогнозов)", 2: "итоговая модель сдачи (высота трассы 2 км)"}
+GENERIC = {1: "только прошлые ВТД: учёт сдвига прибора + соседи + рост", 2: "высота трассы 2 км, уровень по рельефу"}
 CASE_NAMES = {1: "«После ВТД»", 2: "«От ввода»"}
 
 
@@ -29,53 +32,82 @@ class Forecasts:
     def __init__(self, data_dir, work_dir):
         work_dir = Path(work_dir)
         result = solution.run(Path(data_dir), work_dir, work_dir / "result.csv")
-        _, self.grid, _, self.labels = rf.load_tables(work_dir / "cleaning", work_dir / "labels")
+        self.vtd, self.grid, _, self.labels = rf.load_tables(work_dir / "cleaning", work_dir / "labels")
         self.result = result.assign(id=result["id"].astype(str))
         self.targets = {t["id"]: t for t in solution.TARGETS}
+        # Sections whose every raw inspection predates commissioning are left out, as in the first prototype.
+        raw = pd.read_csv(Path(data_dir) / "vtd_south_train.csv", usecols=["id", "date"], dtype={"id": str})
+        raw["date"] = pd.to_datetime(raw["date"], errors="coerce")
+        commissioned = self.grid.groupby("id")["commissioned_at"].first()
+        early = raw.groupby("id")["date"].max().lt(commissioned.reindex(raw["id"].unique()))
+        ids = [pid for pid in commissioned.index if pid not in set(early[early].index)]
+        self.sections = sorted(ids, key=lambda pid: (pid not in self.targets, pid))
 
     def catalog(self):
-        return [{"id": pid, "has_history": t["case"] == 1} for pid, t in self.targets.items()]
+        with_history = set(self.labels["id"].astype(str))
+        out = []
+        for pid in self.sections:
+            item = {"id": pid, "has_history": pid in with_history, "target": pid in self.targets}
+            if pid in self.targets:
+                item.update(case=self.targets[pid]["case"], date=self.targets[pid]["target_date"])
+            out.append(item)
+        return out
 
     def calculate(self, payload):
         pid = str(payload.get("id", "")).strip()
-        if pid not in self.targets:
-            raise ValueError("Выберите одну из двух труб кейса.")
-        target = self.targets[pid]
+        if pid not in self.sections:
+            raise ValueError("Выберите трубу из списка.")
         try:
             case = int(payload.get("case", ""))
         except (ValueError, TypeError):
             raise ValueError("Выберите режим прогноза.") from None
-        if case != target["case"]:
-            raise ValueError(f"Для трубы {pid} итоговая модель считает прогноз в режиме {CASE_NAMES[target['case']]}.")
+        if case not in (1, 2):
+            raise ValueError("Выберите режим прогноза.")
         try:
             chosen = date.fromisoformat(payload.get("date", ""))
         except (ValueError, TypeError):
             raise ValueError("Укажите дату прогноза.") from None
-        target_date = date.fromisoformat(target["target_date"])
-        if chosen != target_date:
-            raise ValueError(f"Итоговая модель считает прогноз для трубы {pid} на {target_date:%d.%m.%Y}.")
-
+        at = pd.Timestamp(chosen)
         section = self.grid.loc[self.grid["id"].astype(str).eq(pid)].set_index("segment_id").sort_index()
-        rows = (self.result.loc[self.result["id"].eq(pid), solution.COLUMNS]
-                .sort_values("segment_id").to_dict("records"))
+        if not section["commissioned_at"].lt(at).all():
+            raise ValueError("Дата прогноза должна быть позже даты ввода участка.")
+
+        target = self.targets.get(pid)
+        if target and case == target["case"] and chosen == date.fromisoformat(target["target_date"]):
+            model = FINAL[case]
+            prediction = self.result.loc[self.result["id"].eq(pid), ["segment_id", "thickness_pred"]]
+        elif case == 1:
+            history = rf.History.before(self.vtd, self.labels, at)
+            made = rf.forecast_case1(history, self.grid, pid, at)
+            if made is None:
+                raise ValueError("Для трубы нет ВТД до выбранной даты. Проверьте дату или выберите «От ввода».")
+            model, prediction = GENERIC[1], made[0][["segment_id", "thickness_pred"]]
+        else:
+            history = rf.History.before(self.vtd, self.labels, at)
+            level = rf.terrain_fallback(history, self.grid, pid, at)
+            model = GENERIC[2]
+            prediction = case2_elevation.forecast(self.grid, level, pid, at)[["segment_id", "thickness_pred"]]
+
         if case == 1:
-            labels = self.labels.loc[self.labels["id"].astype(str).eq(pid)
-                                     & self.labels["inspection_date"].lt(pd.Timestamp(target_date))]
+            labels = self.labels.loc[self.labels["id"].astype(str).eq(pid) & self.labels["inspection_date"].lt(at)]
             last = labels.loc[labels["inspection_date"].eq(labels["inspection_date"].max())]
             reference = last.set_index("segment_id")["min_residual_thickness_mm"].dropna()
         else:
             reference = section["nominal_thickness_mm"]
-        segments = []
-        for row in rows:
-            sid = int(row["segment_id"])
-            row.update(id=pid, segment_id=sid, thickness_pred=float(row["thickness_pred"]))
+        rows, segments = [], []
+        for sid, value in zip(prediction["segment_id"], prediction["thickness_pred"]):
+            sid = int(sid)
+            row = {"id": pid, "segment_id": sid, "thickness_pred": round(float(value), 4)}
+            rows.append(row)
             segments.append(dict(row, baseline=float(reference[sid]) if sid in reference.index else None,
                                  nominal=float(section.at[sid, "nominal_thickness_mm"]),
                                  end_m=float(section.at[sid, "end_m"])))
+        rows.sort(key=lambda r: r["segment_id"])
+        segments.sort(key=lambda r: r["segment_id"])
         count = math.ceil(len(rows) * 0.1)
         priority = sorted(rows, key=lambda r: (r["thickness_pred"], r["segment_id"]))[:count]
-        return {"id": pid, "case": str(case), "date": target_date.isoformat(),
-                "length": float(section["end_m"].max()), "model": MODELS[case],
+        return {"id": pid, "case": str(case), "date": chosen.isoformat(),
+                "length": float(section["end_m"].max()), "model": model,
                 "segments": segments, "rows": rows, "priority": priority}
 
 
